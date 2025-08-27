@@ -21,6 +21,17 @@ def ussd_handler():
     service_code = request.form.get('serviceCode')
     phone_number = request.form.get('phoneNumber')
     text = request.form.get('text', '')
+
+     # Validate required parameters
+    if not session_id or not service_code or not phone_number:
+        print("Missing parameters:", {
+            "sessionId": session_id,
+            "serviceCode": service_code,
+            "phoneNumber": phone_number
+        })
+        return Response("Missing required parameters", status=400)
+
+    # Proceed with USSD handling
     
     with session_lock:
         response = handle_ussd(
@@ -48,4 +59,5 @@ if __name__ == '__main__':
     
     Timer(60, schedule_cleanup).start()
     
+
     app.run(host='0.0.0.0', port=5000, debug=True)
