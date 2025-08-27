@@ -17,6 +17,7 @@ session_lock = threading.Lock()
 @app.route('/ussd', methods=['POST'])
 def ussd_handler():
     # Extract parameters
+    data = request.get_json()
     session_id = request.form.get('sessionId')
     service_code = request.form.get('serviceCode')
     phone_number = request.form.get('phoneNumber')
@@ -61,4 +62,5 @@ if __name__ == '__main__':
     
 
     app.run(host='0.0.0.0', port=8000, debug=True)
+
 
