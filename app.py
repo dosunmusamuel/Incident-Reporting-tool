@@ -202,6 +202,13 @@ def ussd_handler():
             payload = _make_response_payload(session_id, merged, response_text)
             # Save payload in replay cache with timestamp
             replay_cache[session_id] = (payload, time.time())
+
+            # --- NEW: Cleanup session immediately if END response ---
+            if not payload['continueSession']:
+                print(f"[USSD] Session {session_id} ended. Removing from session_store and replay_cache.")
+                session_store.pop(session_id, None)
+                replay_cache.pop(session_id, None)
+
     except Exception as e:
         print("Error in handle_ussd:", str(e))
         fallback = {

@@ -4,14 +4,15 @@ from database import db, User, Incident
 import random
 import string
 
-# Incident categories
+# Cyber incident categories (numeric menu + readable labels)
 INCIDENT_CATEGORIES = {
-    '1': "Theft/Burglary",
-    '2': "Fire Hazard",
-    '3': "Accident",
-    '4': "Harassment",
-    '5': "Infrastructure Damage",
-    '6': "Public Health Concern"
+    '1': "Forgery (Digital)",
+    '2': "Fraud (Digital)",
+    '3': "Cyber Terrorism",
+    '4': "Cyberstalking",
+    '5': "Phishing",
+    '6': "Spam / Scam",
+    '7': "Malware / Virus"
 }
 
 # Severity levels
@@ -41,7 +42,7 @@ class USSDSession:
         """Generate unique reference number"""
         date_str = datetime.utcnow().strftime("%Y%m%d")
         rand_str = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-        return f"INC-{date_str}-{rand_str}"
+        return f"CYB-{date_str}-{rand_str}"
 
 # module-level replay cache (in-memory)
 session_responses = {}   # key: session_id -> last response string
@@ -49,12 +50,10 @@ session_responses = {}   # key: session_id -> last response string
 def _looks_like_initial_dial(text: str):
     """
     Return True if text looks like an initial USSD dial (e.g. '*123#' or empty).
-    Otherwise False (likely a user selection like '1', '2', '1234', etc.).
     """
     if not text:
         return True
     t = str(text).strip()
-    # if it contains '*' or '#' treat as a dial string
     if '*' in t or '#' in t:
         return True
     return False
@@ -65,6 +64,24 @@ def _normalize_input(s):
     s = str(s)
     s = s.replace('\uFF03', '#').replace('\uFF0A', '*').replace('＃', '#').replace('＊', '*')
     return s.strip()
+
+def _match_category_input(user_input):
+    """
+    Accept numeric menu or typed keyword (case-insensitive substring match).
+    Returns category key (string) or None.
+    """
+    if not user_input:
+        return None
+    ui = user_input.strip()
+    # direct numeric match
+    if ui in INCIDENT_CATEGORIES:
+        return ui
+    # allow typed keyword matching against the label
+    low = ui.lower()
+    for k, v in INCIDENT_CATEGORIES.items():
+        if low in v.lower():
+            return k
+    return None
 
 def handle_ussd(session_store, session_id, phone_number, user_input, new_session=False, replay_cache=None, session_ttl_minutes: int = 5):
     """
@@ -82,8 +99,6 @@ def handle_ussd(session_store, session_id, phone_number, user_input, new_session
     # Normalize input to be safe
     user_input = _normalize_input(user_input)
 
-    # If provider says newSession and we have a cached reply and this is an initial dial, replay handled in app.py fast-path
-    # (we keep replay cache write here for completeness)
     # Get existing session
     session = session_store.get(session_id)
 
@@ -94,15 +109,11 @@ def handle_ussd(session_store, session_id, phone_number, user_input, new_session
         session_store[session_id] = session
         created_new_session = True
 
-        # IMPORTANT: if the incoming payload includes a real selection (e.g., '1','2', etc.)
-        # and it does *not* look like an initial dial (like '*123#'), set the session.state to MAIN_MENU
+        # If incoming payload includes a real selection (e.g., '1','phishing', etc.)
+        # and it does *not* look like an initial dial, set the session.state to MAIN_MENU
         # so the incoming selection will be processed rather than being discarded.
         if user_input and (not _looks_like_initial_dial(user_input)):
             session.state = "MAIN_MENU"
-
-    else:
-        # if session exists, do nothing special — we will process normally
-        pass
 
     # Update activity timestamp
     session.update_activity()
@@ -111,7 +122,7 @@ def handle_ussd(session_store, session_id, phone_number, user_input, new_session
     response = None
 
     if session.state == "INITIAL":
-        response = ("CON Welcome to Incident Reporting:\n"
+        response = ("CON Cyber Incident Reporting:\n"
                    "1. Report New Incident\n"
                    "2. View Previous Reports\n"
                    "3. Help\n"
@@ -128,16 +139,21 @@ def handle_ussd(session_store, session_id, phone_number, user_input, new_session
             response = get_recent_reports(phone_number)
         elif user_input == '3':
             session.state = "INITIAL"
-            response = ("END Contact support:\n"
-                        "Email: support@incident.org\n"
-                        "Phone: +1234567890")
+            response = (
+                "END Help - Cyber Incident Reporting:\n"
+                "• What to report: Forgery, Fraud, Terrorism,\n"
+                "  Cyberstalking, Phishing, Spam, Malware.\n"
+                "• Include: platform/URL, attacker handle, sample link, date/time.\n"
+                "• Evidence: paste an accessible URL or contact email for follow-up.\n"
+                "Emergencies: call +1234567890\n"
+                "Email: cyber-support@incident.org"
+            )
         elif user_input == '0':
             session.state = "EXIT"
-            response = "END Thank you. Stay safe."
+            response = "END Thank you. Stay safe online."
         else:
-            # If there's no input (user just dialed) show menu. If input is invalid selection, show invalid.
             if not user_input:
-                response = ("CON Welcome to Incident Reporting:\n"
+                response = ("CON Cyber Incident Reporting:\n"
                             "1. Report New Incident\n"
                             "2. View Previous Reports\n"
                             "3. Help\n"
@@ -147,12 +163,14 @@ def handle_ussd(session_store, session_id, phone_number, user_input, new_session
                 response = "END Invalid option. Please dial again."
 
     elif session.state == "CATEGORY_SELECT":
-        if user_input in INCIDENT_CATEGORIES:
-            session.incident_data['category'] = INCIDENT_CATEGORIES[user_input]
+        matched = _match_category_input(user_input)
+        if matched:
+            session.incident_data['category'] = INCIDENT_CATEGORIES[matched]
             session.state = "LOCATION_INPUT"
-            response = "CON Enter location (e.g., Building A, Room 101):"
+            # For cyber incidents, "location" can be a URL, platform, or physical location
+            response = ("CON Enter location / platform / URL (e.g., example.com, Twitter @user, Building A):")
         else:
-            response = "END Invalid category. Please start again."
+            response = ("END Invalid category. Please start again.")
 
     elif session.state == "LOCATION_INPUT":
         if user_input:
@@ -161,13 +179,13 @@ def handle_ussd(session_store, session_id, phone_number, user_input, new_session
             response = ("CON Select Severity Level:\n" +
                         "\n".join([f"{k}. {v}" for k, v in SEVERITY_LEVELS.items()]))
         else:
-            response = "CON Enter location (e.g., Building A, Room 101):"
+            response = "CON Enter location / platform / URL (e.g., example.com, Twitter @user, Building A):"
 
     elif session.state == "SEVERITY_SELECT":
         if user_input in SEVERITY_LEVELS:
             session.incident_data['severity'] = SEVERITY_LEVELS[user_input]
             session.state = "DESCRIPTION_INPUT"
-            response = "CON Briefly describe the incident:"
+            response = "CON Briefly describe the incident (include attacker handle, sample URL, or any evidence):"
         else:
             response = "END Invalid severity level. Please start again."
 
@@ -181,7 +199,7 @@ def handle_ussd(session_store, session_id, phone_number, user_input, new_session
                        f"Description: {session.incident_data.get('description','-')}")
             response = f"CON Confirm submission:\n{summary}\n1. Submit\n2. Cancel"
         else:
-            response = "CON Briefly describe the incident:"
+            response = "CON Briefly describe the incident (include attacker handle, sample URL, or any evidence):"
 
     elif session.state == "CONFIRMATION":
         if user_input == '1':
@@ -195,7 +213,7 @@ def handle_ussd(session_store, session_id, phone_number, user_input, new_session
     elif session.state == "VIEW_REPORTS":
         if user_input == '0':
             session.state = "INITIAL"
-            response = ("CON Welcome to Incident Reporting:\n"
+            response = ("CON Cyber Incident Reporting:\n"
                         "1. Report New Incident\n"
                         "2. View Previous Reports\n"
                         "3. Help\n0. Exit")
@@ -209,7 +227,6 @@ def handle_ussd(session_store, session_id, phone_number, user_input, new_session
     try:
         replay_cache[session_id] = response
     except Exception:
-        # ignore if replay_cache is not writable
         pass
 
     return response
