@@ -12,6 +12,6 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    # USSD
+    # USSD -
     USSD_SHORTCODE = config('USSD_SHORTCODE')
     MAX_SESSION_MINUTES = config('MAX_SESSION_MINUTES', default=5, cast=int)
