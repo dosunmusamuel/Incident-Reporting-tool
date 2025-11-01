@@ -7,7 +7,7 @@ def register_routes(app):
     api = Api(app)
     api.add_resource(RegisterResource, "/api/auth/register")
     api.add_resource(LoginResource, "/api/auth/login")
-    api.add_resource(LogoutAccessResource, "/api/auth/logout/access")
+    api.add_resource(LogoutAccessResource, "/api/auth/logout/")
     api.add_resource(LogoutRefreshResource, "/api/auth/logout/refresh")
 
 
