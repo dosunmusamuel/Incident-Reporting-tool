@@ -46,7 +46,10 @@ class Incident(db.Model):
     severity = db.Column(db.String(20), nullable=False)
     description = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="CASCADE"), nullable=False)
+    user_id = db.Column(db.UUID(as_uuid=True), db.ForeignKey('user.id'), nullable=False)
+    
+    # Optional: relationship
+    user = db.relationship('User', backref='incidents')
 
     def summary(self):
         return (
