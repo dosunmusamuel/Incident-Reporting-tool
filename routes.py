@@ -1,5 +1,5 @@
 from flask_restful import Api
-from resources.auth import RegisterResource, LoginResource, LogoutAccessResource, LogoutRefreshResource
+from resources.auth import RegisterResource, LoginResource, LogoutAccessResource, LogoutRefreshResource, RefreshResource
 from resources.dashboard import DashboardResource,IncidentSearchResource,ReportsResource,ExportReportsCSVResource
 #from resources.incidents import IncidentListResource, IncidentResource, IncidentSummaryResource, IncidentStatsResource
 
@@ -9,6 +9,9 @@ def register_routes(app):
     api.add_resource(LoginResource, "/api/auth/login")
     api.add_resource(LogoutAccessResource, "/api/auth/logout/")
     api.add_resource(LogoutRefreshResource, "/api/auth/logout/refresh")
+    api.add_resource(RefreshResource, "/api/auth/refresh")
+
+    
 
 
     api.add_resource(DashboardResource, "/api/dashboard")
