@@ -60,6 +60,7 @@ class LoginResource(Resource):
         refresh = create_refresh_token(identity=str(admin.id))
 
         return {
+            "success":True,
             "access_token": access,
             "refresh_token": refresh,
             "msg":"Login Successful"
@@ -80,7 +81,7 @@ class LogoutAccessResource(Resource):
         jti = get_jwt()["jti"]
         db.session.add(TokenBlocklist(jti=jti, token_type="access"))
         db.session.commit()
-        return {"msg": "access token revoked"}, 200
+        return {"success":True, "msg": "access token revoked"}, 200
 
 
 class LogoutRefreshResource(Resource):

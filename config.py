@@ -1,13 +1,17 @@
+# config.py
+from decouple import config, Csv
+
 class Config:
-    # Jwt Secret Key For Development
-    JWT_SECRET_KEY = "364577233bca3aa8e03dc710fdb320887e838534c76628a3ffdce9b7b1ea3e92"
+    # JWT
+    JWT_SECRET_KEY = config('JWT_SECRET_KEY')
 
-    # Database configuration
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///incidents.db'
+    # PostgreSQL – build the URI from env vars
+    SQLALCHEMY_DATABASE_URI = (
+        f"postgresql://{config('POSTGRES_USER')}:{config('POSTGRES_PASSWORD')}@"
+        f"{config('POSTGRES_HOST')}:{config('POSTGRES_PORT')}/{config('POSTGRES_DB')}"
+    )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    
-    # USSD Configuration
-    USSD_SHORTCODE = "*123#"
-    MAX_SESSION_MINUTES = 5  # Session timeout
 
-    
+    # USSD
+    USSD_SHORTCODE = config('USSD_SHORTCODE')
+    MAX_SESSION_MINUTES = config('MAX_SESSION_MINUTES', default=5, cast=int)

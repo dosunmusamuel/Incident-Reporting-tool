@@ -8,40 +8,22 @@ from sqlalchemy import or_
 import csv
 from io import StringIO
 from flask import Response
-
-
+from .utils import authenticate_admin
 import uuid
 
 
 class DashboardResource(Resource):
-    @jwt_required()
     def get(self):
-        # Identity is stored as {"admin_id": <id>} in the example auth code above
-        
-        identity = get_jwt_identity()
+        admin, error = authenticate_admin()
+        if error:
+            return error
 
-        # check if identity exists first
-        if not identity:
-            return {"success": False, "msg": "invalid token identity"}, 401
-
-        # convert to UUID
-        try:
-            admin_id = uuid.UUID(identity)
-        except ValueError:
-            return {"success": False, "msg": "invalid token identity"}, 401
-
-        # now query the admin
-        admin = Admin.query.get(admin_id)
-        if not admin:
-            return {"success": False, "msg": "admin not found"}, 404
-
-                
         now = datetime.utcnow()
 
-        # total number of incident reports
+        # Total reports
         total_reports = db.session.query(Incident).count()
-        
-        # reports in the last 30 days (count)
+
+        # Last 30 days
         thirty_days_ago = now - timedelta(days=30)
         this_month_count = (
             db.session.query(Incident)
@@ -49,32 +31,33 @@ class DashboardResource(Resource):
             .count()
         )
 
-        # reports for "today" (UTC): from 00:00:00 UTC to now
-        start_of_today = datetime(year=now.year, month=now.month, day=now.day)
-        today_count = (
+        # Today (UTC)
+        start_of_today = datetime(now.year, now.month, now.day)
+        today_incidents = (
             Incident.query
             .filter(Incident.created_at >= start_of_today)
             .order_by(Incident.created_at.desc())
             .all()
         )
 
-        # last 8 incidents (most recent first)
-        last_reports_query = (
+        # Last 8 incidents
+        last_reports = (
             Incident.query
             .order_by(Incident.created_at.desc())
             .limit(8)
             .all()
         )
 
-        report_history = []
-        for inc in last_reports_query:
-            report_history.append({
+        report_history = [
+            {
                 "id": inc.id,
                 "category": inc.category,
                 "severity": inc.severity,
                 "location": inc.location,
                 "description": inc.description or ""
-            })
+            }
+            for inc in last_reports
+        ]
 
         return {
             "success": True,
@@ -85,8 +68,8 @@ class DashboardResource(Resource):
             },
             "stats": {
                 "total_reports_count": total_reports,
-                "this_month_count":this_month_count,
-                "today_count":today_count
+                "this_month_count": this_month_count,
+                "today_count": len(today_incidents)
             },
             "report_history": report_history
         }, 200
@@ -94,50 +77,24 @@ class DashboardResource(Resource):
 
 
 class ReportsResource(Resource):
-    @jwt_required()
     def get(self):
-        # --- Parse query parameters ---
+        admin, error = authenticate_admin()
+        if error:
+            return error
+
         parser = reqparse.RequestParser()
-        parser.add_argument("category", type=str, required=False, help="Filter by category", location="args")
-        parser.add_argument("severity", type=str, required=False, help="Filter by severity", location="args")
+        parser.add_argument("category", type=str, location="args")
+        parser.add_argument("severity", type=str, location="args")
         args = parser.parse_args()
 
-        category_filter = args.get("category")
-        severity_filter = args.get("severity")
-        # --- Get admin identity from JWT ---
-        
-        identity = get_jwt_identity()
-
-        # check if identity exists first
-        if not identity:
-            return {"success": False, "msg": "invalid token identity"}, 401
-
-        # convert to UUID
-        try:
-            admin_id = uuid.UUID(identity)
-        except ValueError:
-            return {"success": False, "msg": "invalid token identity"}, 401
-
-        # now query the admin
-        admin = Admin.query.get(admin_id)
-        if not admin:
-            return {"success": False, "msg": "admin not found"}, 404
-
-        # --- Build the base query ---
         query = Incident.query
+        if args["category"]:
+            query = query.filter(Incident.category == args["category"])
+        if args["severity"]:
+            query = query.filter(Incident.severity == args["severity"])
 
-        if category_filter:
-            query = query.filter(Incident.category == category_filter)
-        if severity_filter:
-            query = query.filter(Incident.severity == severity_filter)
+        reports = query.order_by(Incident.created_at.desc()).all()
 
-        # --- Order by most recent ---
-        query = query.order_by(Incident.created_at.desc())
-
-        # --- Execute query ---
-        reports = query.all()
-
-        # --- Build response ---
         report_history = [
             {
                 "id": inc.id,
@@ -156,39 +113,21 @@ class ReportsResource(Resource):
         }, 200
 
 
-
 # app/resources/search.py
 class IncidentSearchResource(Resource):
-    @jwt_required()
     def get(self):
-        # --- Parse search query ---
+        admin, error = authenticate_admin()
+        if error:
+            return error
+
         parser = reqparse.RequestParser()
-        parser.add_argument("q", type=str, required=True, help="Search query is required", location="args")
+        parser.add_argument("q", type=str, required=True, location="args")
         args = parser.parse_args()
-        query_term = args.get("q").strip()
+        query_term = args["q"].strip()
 
         if not query_term:
             return {"success": False, "msg": "Search query cannot be empty"}, 400
 
-        # --- Get admin identity from JWT ---
-        identity = get_jwt_identity()
-
-        # check if identity exists first
-        if not identity:
-            return {"success": False, "msg": "invalid token identity"}, 401
-
-        # convert to UUID
-        try:
-            admin_id = uuid.UUID(identity)
-        except ValueError:
-            return {"success": False, "msg": "invalid token identity"}, 401
-
-        # now query the admin
-        admin = Admin.query.get(admin_id)
-        if not admin:
-            return {"success": False, "msg": "admin not found"}, 404
-
-        # --- Build search query ---
         incidents = Incident.query.filter(
             or_(
                 Incident.description.ilike(f"%{query_term}%"),
@@ -199,7 +138,6 @@ class IncidentSearchResource(Resource):
             )
         ).order_by(Incident.created_at.desc()).all()
 
-        # --- Build response ---
         results = [
             {
                 "id": inc.id,
@@ -220,41 +158,21 @@ class IncidentSearchResource(Resource):
 
 # app/resources/export.py
 class ExportReportsCSVResource(Resource):
-    @jwt_required()
     def get(self):
-        # --- Authenticate admin ---
-        identity = get_jwt_identity()
+        admin, error = authenticate_admin()
+        if error:
+            return error
 
-        # check if identity exists first
-        if not identity:
-            return {"success": False, "msg": "invalid token identity"}, 401
-
-        # convert to UUID
-        try:
-            admin_id = uuid.UUID(identity)
-        except ValueError:
-            return {"success": False, "msg": "invalid token identity"}, 401
-
-        # now query the admin
-        admin = Admin.query.get(admin_id)
-        if not admin:
-            return {"success": False, "msg": "admin not found"}, 404
-
-        # --- Fetch all incidents ---
         incidents = Incident.query.order_by(Incident.created_at.desc()).all()
 
-        # --- Create CSV in memory ---
         output = StringIO()
         writer = csv.writer(output)
 
-        # Write header row
         writer.writerow(["ID", "Reference", "Category", "Severity", "Location", "Description", "Created At", "User ID"])
-
-        # Write incident rows
         for inc in incidents:
             writer.writerow([
                 inc.id,
-                inc.reference,
+                inc.reference or "",
                 inc.category,
                 inc.severity,
                 inc.location,
@@ -263,7 +181,6 @@ class ExportReportsCSVResource(Resource):
                 inc.user_id
             ])
 
-        # Prepare response
         output.seek(0)
         return Response(
             output,
