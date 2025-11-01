@@ -1,25 +1,31 @@
-# app.py (top section) - paste/replace up to before session_store definition
+# app.py
 from flask import Flask, request, jsonify
 from flask_restful import Api
-from ussd.ussd_handler import ussd_bp,start_cleanup
-from models.database import init_db  # init_db will call db.init_app and optionally create_all/migrations
+from ussd.ussd_handler import ussd_bp, start_cleanup
+from models.database import init_db
 from config import Config
 import threading, time
 
-# auth / jwt imports
+# JWT imports
+import jwt as pyjwt
+from jwt import exceptions as pyjwt_exceptions
 from flask_jwt_extended import (
     JWTManager, create_access_token, create_refresh_token,
-    get_jwt, get_jwt_identity, jwt_required
+    get_jwt, get_jwt_identity, jwt_required,
+    JWTExtendedException, NoAuthorizationError, InvalidHeaderError
 )
 
 app = Flask(__name__)
 app.config.from_object(Config)
 
-# Ensure Config has JWT_SECRET_KEY set
-# Initialize DB BEFORE registering resources that may query DB
-init_db(app)          # <-- make sure this runs (or db.init_app + migrate.init_app elsewhere)
+# === CONFIG ===
+app.config['JWT_ERROR_MESSAGE_KEY'] = 'msg'
+app.config['JWT_TOKEN_LOCATION'] = ['headers']
 
-# JWT setup
+# === INIT DB ===
+init_db(app)
+
+# === JWT ===
 jwt = JWTManager()
 jwt.init_app(app)
 
@@ -28,7 +34,6 @@ def check_if_token_revoked(jwt_header, jwt_payload):
     jti = jwt_payload.get("jti")
     if not jti:
         return True
-    # TokenBlocklist imported inside database.py; safe to query inside request context
     from models.database import TokenBlocklist
     return TokenBlocklist.query.filter_by(jti=jti).first() is not None
 
@@ -47,22 +52,49 @@ def invalid_token_callback(error_string):
 @jwt.unauthorized_loader
 def missing_token_callback(error_string):
     return jsonify({"msg": "Missing Authorization Header", "error": error_string}), 401
-# --- end JWT setup ---
 
+# === ERROR HANDLERS (use @app, not @current_app) ===
+@app.errorhandler(pyjwt_exceptions.ExpiredSignatureError)
+def handle_pyjwt_expired(err):
+    app.logger.debug("PyJWT ExpiredSignatureError: %s", err)
+    return jsonify({"msg": "Token expired"}), 401
 
-# register url routes 
+@app.errorhandler(pyjwt_exceptions.InvalidTokenError)
+def handle_pyjwt_invalid(err):
+    app.logger.debug("PyJWT InvalidTokenError: %s", err)
+    return jsonify({"msg": "Invalid token", "error": str(err)}), 422
+
+@app.errorhandler(JWTExtendedException)
+def handle_jwt_extended(err):
+    app.logger.debug("JWTExtendedException: %s", err)
+    return jsonify({"msg": str(err)}), 401
+
+@app.errorhandler(NoAuthorizationError)
+def handle_no_authorization(err):
+    app.logger.debug("NoAuthorizationError: %s", err)
+    return jsonify({"msg": "Missing Authorization Header"}), 401
+
+@app.errorhandler(InvalidHeaderError)
+def handle_invalid_header(err):
+    app.logger.debug("InvalidHeaderError: %s", err)
+    return jsonify({"msg": "Invalid Authorization Header"}), 401
+
+from werkzeug.exceptions import HTTPException
+
+@app.errorhandler(HTTPException)
+def handle_http_exception(e):
+    app.logger.debug("HTTPException: %s", e)
+    return jsonify({"msg": e.description}), e.code
+
+@app.errorhandler(Exception)
+def handle_unexpected_exception(e):
+    app.logger.exception("Unhandled exception")
+    return jsonify({"msg": "Internal server error"}), 500
+
+# === ROUTES ===
 from routes import register_routes
 register_routes(app)
-
-
-# register ussd route
 app.register_blueprint(ussd_bp)
 
-# start the ussd cleanup loop (runs in background)
+# === BACKGROUND ===
 start_cleanup()
-
-
-# from flask_migrate import Migrate
-# from database import db
-
-# migrate = Migrate(app, db)
