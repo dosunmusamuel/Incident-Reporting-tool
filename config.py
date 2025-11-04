@@ -15,3 +15,11 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     USSD_SHORTCODE = config('USSD_SHORTCODE')
     MAX_SESSION_MINUTES = config('MAX_SESSION_MINUTES', default=5, cast=int)
+
+    # Connection pool health
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_pre_ping': True,
+        'pool_recycle': 300,
+        'pool_size': 5,
+        'max_overflow': 10
+    }
