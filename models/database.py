@@ -48,9 +48,6 @@ class Incident(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user_id = db.Column(db.UUID(as_uuid=True), db.ForeignKey('user.id'), nullable=False)
     
-    # Optional: relationship
-    user = db.relationship('User', backref='incidents')
-
     def summary(self):
         return (
             f"Ref: {self.reference}\n"
