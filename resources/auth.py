@@ -10,6 +10,7 @@ from flask_jwt_extended import (
 )
 from sqlalchemy.exc import IntegrityError
 from models.database import db, Admin, TokenBlocklist
+from .utils import authenticate_admin
 
 class RegisterResource(Resource):
     def post(self):
@@ -78,6 +79,9 @@ class RefreshResource(Resource):
 class LogoutAccessResource(Resource):
     @jwt_required()
     def post(self):
+        admin, error = authenticate_admin()
+        if error:
+            return error
         jti = get_jwt()["jti"]
         db.session.add(TokenBlocklist(jti=jti, token_type="access"))
         db.session.commit()
