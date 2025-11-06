@@ -4,6 +4,7 @@ from flask_restful import Api
 from ussd.ussd_handler import ussd_bp, start_cleanup
 from models.database import init_db
 from config import Config
+from flask_cors import CORS
 
 # JWT
 from flask_jwt_extended import JWTManager
@@ -19,6 +20,7 @@ init_db(app)
 # === JWT ===
 jwt = JWTManager(app) 
 
+CORS(app)
 
 # General HTTP errors
 from werkzeug.exceptions import HTTPException
