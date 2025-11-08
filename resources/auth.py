@@ -24,11 +24,6 @@ class RegisterResource(Resource):
         if not password or not email:
             return {"success": False, "msg": "email and password required"}, 400
 
-        # optional: normalize phone format here
-
-        if Admin.query.filter_by(phone_number=phone).first():
-            return {"success": False, "msg": "admin already exists"}, 400
-
         admin = Admin(email=email, phone_number=phone, first_name=first_name, last_name=last_name)
         admin.set_password(password)
 
