@@ -21,8 +21,8 @@ class Admin(db.Model):
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     first_name = db.Column(db.String(255), nullable=True)
     last_name = db.Column(db.String(255), nullable=True)
-    email = db.Column(db.String(255), unique=True, nullable=True)  
-    phone_number = db.Column(db.String(20), unique=True, nullable=False)
+    email = db.Column(db.String(255), unique=True, nullable=False)  
+    phone_number = db.Column(db.String(20), default='')
     password_hash = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
