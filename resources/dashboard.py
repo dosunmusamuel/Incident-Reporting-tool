@@ -54,7 +54,8 @@ class DashboardResource(Resource):
                 "category": inc.category,
                 "severity": inc.severity,
                 "location": inc.location,
-                "description": inc.description or ""
+                "description": inc.description or "",
+                "date": inc.created_at.date().isoformat() if inc.created_at else ''
             }
             for inc in last_reports
         ]
@@ -102,6 +103,7 @@ class ReportsResource(Resource):
                 "severity": inc.severity,
                 "location": inc.location,
                 "description": inc.description or "",
+                "date": inc.created_at.date().isoformat() if inc.created_at else ''
             }
             for inc in reports
         ]
@@ -145,6 +147,7 @@ class IncidentSearchResource(Resource):
                 "severity": inc.severity,
                 "location": inc.location,
                 "description": inc.description or "",
+                "date": inc.created_at.date().isoformat() if inc.created_at else ''
             }
             for inc in incidents
         ]
@@ -177,7 +180,7 @@ class ExportReportsCSVResource(Resource):
                 inc.severity,
                 inc.location,
                 inc.description or "",
-                inc.created_at.isoformat(),
+                inc.created_at.date().isoformat(),
                 inc.user_id
             ])
 

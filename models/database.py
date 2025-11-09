@@ -19,8 +19,8 @@ class User(db.Model):
 
 class Admin(db.Model):
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    first_name = db.Column(db.String(255), nullable=True)
-    last_name = db.Column(db.String(255), nullable=True)
+    first_name = db.Column(db.String(255), default='')
+    last_name = db.Column(db.String(255), default='')
     email = db.Column(db.String(255), unique=True, nullable=False)  
     phone_number = db.Column(db.String(20), default='')
     password_hash = db.Column(db.String(255), nullable=True)

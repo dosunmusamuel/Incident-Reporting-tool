@@ -1,5 +1,7 @@
 # config.py
 from decouple import config
+from datetime import timedelta
+
 
 def _get_db_uri():
     uri = config('DATABASE_URL')
@@ -11,6 +13,12 @@ def _get_db_uri():
 
 class Config:
     JWT_SECRET_KEY = config('JWT_SECRET_KEY')
+
+    # Make access tokens expire in 14 days (2 weeks)
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(days=14)
+    # Keep refresh tokens slightly longer (optional) — e.g., 30 days
+    JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=30)
+    
     SQLALCHEMY_DATABASE_URI = _get_db_uri()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     USSD_SHORTCODE = config('USSD_SHORTCODE')
