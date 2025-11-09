@@ -1,6 +1,6 @@
 from flask_restful import Api
 from resources.auth import RegisterResource, LoginResource, LogoutAccessResource, LogoutRefreshResource, RefreshResource
-from resources.dashboard import DashboardResource,IncidentSearchResource,ReportsResource,ExportReportsCSVResource
+from resources.dashboard import DashboardResource,IncidentSearchResource,ReportsResource,ExportReportsExcelResource
 #from resources.incidents import IncidentListResource, IncidentResource, IncidentSummaryResource, IncidentStatsResource
 
 def register_routes(app):
@@ -17,4 +17,4 @@ def register_routes(app):
     api.add_resource(DashboardResource, "/api/dashboard")
     api.add_resource(ReportsResource, "/api/reports")
     api.add_resource(IncidentSearchResource, "/api/search")
-    api.add_resource(ExportReportsCSVResource, "/api/export")
+    api.add_resource(ExportReportsExcelResource, "/api/export")
