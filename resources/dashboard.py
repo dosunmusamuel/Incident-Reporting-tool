@@ -10,6 +10,8 @@ from io import StringIO
 from flask import Response
 from .utils import authenticate_admin
 import uuid
+import pandas as pd
+from io import BytesIO
 
 
 class DashboardResource(Resource):
@@ -160,33 +162,43 @@ class IncidentSearchResource(Resource):
 
 
 # app/resources/export.py
-class ExportReportsCSVResource(Resource):
+
+class ExportReportsExcelResource(Resource):
     def get(self):
         admin, error = authenticate_admin()
         if error:
             return error
 
+        # Fetch incidents
         incidents = Incident.query.order_by(Incident.created_at.desc()).all()
 
-        output = StringIO()
-        writer = csv.writer(output)
-
-        writer.writerow(["ID", "Reference", "Category", "Severity", "Location", "Description", "Created At", "User ID"])
+        # Prepare data for Excel
+        data = []
         for inc in incidents:
-            writer.writerow([
-                inc.id,
-                inc.reference or "",
-                inc.category,
-                inc.severity,
-                inc.location,
-                inc.description or "",
-                inc.created_at.date().isoformat(),
-                inc.user_id
-            ])
+            data.append({
+                "ID": inc.id,
+                "Reference": inc.reference or "",
+                "Category": inc.category,
+                "Severity": inc.severity,
+                "Location": inc.location,
+                "Description": inc.description or "",
+                "Created At": inc.created_at.date().isoformat() if inc.created_at else "",
+                "User ID": str(inc.user_id)
+            })
+
+        # Convert to DataFrame
+        df = pd.DataFrame(data)
+
+        # Write Excel to BytesIO buffer
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name="Incidents")
 
         output.seek(0)
+
+        # Return as Excel file
         return Response(
-            output,
-            mimetype="text/csv",
-            headers={"Content-Disposition": "attachment;filename=incident_reports.csv"}
+            output.getvalue(),
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment;filename=incident_reports.xlsx"}
         )
