@@ -125,22 +125,38 @@ class IncidentSearchResource(Resource):
             return error
 
         parser = reqparse.RequestParser()
-        parser.add_argument("q", type=str, required=True, location="args")
+        parser.add_argument("q", type=str, location="args")
+        parser.add_argument("category", type=str, location="args")
+        parser.add_argument("severity", type=str, location="args")
         args = parser.parse_args()
-        query_term = args["q"].strip()
 
-        if not query_term:
-            return {"success": False, "msg": "Search query cannot be empty"}, 400
+        query = Incident.query
 
-        incidents = Incident.query.filter(
-            or_(
-                Incident.description.ilike(f"%{query_term}%"),
-                Incident.category.ilike(f"%{query_term}%"),
-                Incident.location.ilike(f"%{query_term}%"),
-                Incident.severity.ilike(f"%{query_term}%"),
-                Incident.reference.ilike(f"%{query_term}%")
+        # 🔍 Text search (optional)
+        query_term = args.get("q")
+        if query_term:
+            query_term = query_term.strip()
+            if not query_term:
+                return {"success": False, "msg": "Search query cannot be empty"}, 400
+            query = query.filter(
+                or_(
+                    Incident.description.ilike(f"%{query_term}%"),
+                    Incident.category.ilike(f"%{query_term}%"),
+                    Incident.location.ilike(f"%{query_term}%"),
+                    Incident.severity.ilike(f"%{query_term}%"),
+                    Incident.reference.ilike(f"%{query_term}%")
+                )
             )
-        ).order_by(Incident.created_at.desc()).all()
+
+        # 🧩 Category filter
+        if args.get("category"):
+            query = query.filter(Incident.category == args["category"])
+
+        # ⚠️ Severity filter
+        if args.get("severity"):
+            query = query.filter(Incident.severity == args["severity"])
+
+        incidents = query.order_by(Incident.created_at.desc()).all()
 
         results = [
             {
