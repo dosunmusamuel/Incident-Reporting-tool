@@ -1,17 +1,13 @@
 # resources/auth.py
 from flask_restful import Resource
 from flask import request, jsonify
-from flask_jwt_extended import (
-    create_access_token,
-    create_refresh_token,
-    jwt_required,
-    get_jwt,
-    get_jwt_identity
-)
+from flask_jwt_extended import (create_access_token, create_refresh_token,jwt_required, get_jwt, get_jwt_identity)
 from sqlalchemy.exc import IntegrityError
 from models.database import db, Admin, TokenBlocklist
 from .utils import authenticate_admin
 
+
+# Registration Resource
 class RegisterResource(Resource):
     def post(self):
         data = request.get_json() or {}
@@ -37,6 +33,7 @@ class RegisterResource(Resource):
         return {"success": True, "msg": "admin created"}, 201
 
 
+# Login Resource 
 class LoginResource(Resource):
     def post(self):
         data = request.get_json() or {}
@@ -63,6 +60,7 @@ class LoginResource(Resource):
         },200
 
 
+# Refresh JWT Resource
 class RefreshResource(Resource):
     @jwt_required(refresh=True)
     def post(self):

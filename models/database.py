@@ -7,6 +7,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
 
+# User model for USSD
 class User(db.Model):
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     phone_number = db.Column(db.String(20), unique=True, nullable=False)
@@ -16,7 +17,7 @@ class User(db.Model):
     def __repr__(self):
         return f"<User {self.phone_number}>"
 
-
+# Admin model 
 class Admin(db.Model):
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     first_name = db.Column(db.String(255), default='')
@@ -38,6 +39,7 @@ class Admin(db.Model):
         return f"<Admin {self.phone_number}>"
 
 
+# Incident model
 class Incident(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     reference = db.Column(db.String(20), unique=True, nullable=False)
@@ -57,12 +59,15 @@ class Incident(db.Model):
             f"Date: {self.created_at.strftime('%Y-%m-%d %H:%M')}"
         )
 
+
+# JWT Model
 class TokenBlocklist(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     jti = db.Column(db.String(36), nullable=False, index=True)
     token_type = db.Column(db.String(10), nullable=False)  # access / refresh
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+# Database initiator
 def init_db(app):
     db.init_app(app)
     with app.app_context():
